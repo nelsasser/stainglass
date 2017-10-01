@@ -1,0 +1,98 @@
+* {
+    box-sizing: border-box;
+}
+
+html {
+    font-family: monospace
+}
+
+body {
+    background-color: black;
+}
+
+#menu {
+    width: 10%;
+    height: 100%;
+    float: left;
+    background: black;
+    margin: 10px;
+    padding: 10px
+}
+
+#main {
+    width: 75%;
+    float: left;
+    background-color: #1e2023;
+    margin: 10px;
+    padding: 10px;
+    border-left: solid 10px gray;
+    display: inline-block;
+}
+
+#main-input {
+    width: 25%;
+    max-width: 150px;
+    display: inline-block;
+}
+
+#main-view {
+    display: inline-block;
+    padding: 10px;
+    margin: 10px;
+}
+
+#input {
+    width: 100%;
+    max-width: 150px;
+    height: 20pxpx;
+    background-color: #555555;
+    color: white;
+    margin: 4px;
+    border-radius: 8px;
+    padding: 10px
+}
+
+button {
+    background-color: #555555;
+    border: none;
+    color: white;
+    width: 100%;
+    max-width: 150px;
+    padding: 15px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: list-item;
+    border-radius: 8px;
+    margin: 4px;
+    border-style: solid;
+    border-color: #555555;
+    transition-duration: 0.2s;
+}
+
+button:hover {
+    background-color: whitesmoke;
+    border-color: #555555;
+    color: black;
+}
+
+ul {
+    background: black;
+    list-style: none;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border-left: grey solid 5px;
+}
+
+li a {
+    display: block;
+    width: 100%;
+    color: white;
+    padding: 8px 15px;
+    text-decoration: none;
+}
+
+li a:hover {
+    background-color: whitesmoke;
+    color: black;
+}

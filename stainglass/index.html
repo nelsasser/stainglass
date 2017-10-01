@@ -1,0 +1,331 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <title>StainGlass</title>
+    <script type="text/javascript" onload="loaded=1" src="js/pixi.js"></script>
+    <script type="text/javascript" onload="loaded=1" src="js/vgen.js"></script>
+    <meta name="viewport" content="width=device-width" , initial-scale=1.0>
+    <link rel="stylesheet" type="text/css" href="style-sheet-main.css">
+
+</head>
+
+<body>
+    <div id="menu">
+        <ul>
+            <li><a href="index.html">App</a></li>
+            <li><a href="bts.html">BTS</a></li>
+            <li><a href="help.html">Help</a></li>
+        </ul>
+    </div>
+    <div id="main">
+        <div id="main-input">
+            <input id="file-selection" type="file" onchange="update()" hidden><br>
+            <button onclick="document.getElementById('file-selection').click()">Select Image</button>
+            <button onclick="updateImage()">Generate</button>
+            <p></p>
+            <div id="input">
+                <div class="input">
+
+                    <head>X Spacing: </head>
+                    <input type="range" id="range_space_x" onchange="updateValues()">
+                    <p id="p1"></p><br>
+                </div>
+                <div class="input">
+
+                    <head>Y Spacing: </head>
+                    <input type="range" id="range_space_y" onchange="updateValues()">
+                    <p id="p2"></p><br>
+                </div>
+                <div class="input">
+
+                    <head>Offset: </head>
+                    <input type="range" id="range_max_magnitude" onchange="updateValues()">
+                    <p id="p3"></p><br>
+                </div>
+            </div>
+        </div>
+        <div id="main-view">
+            <img src="" alt="" id="user-image">
+        </div>
+
+        <script type="text/javascript">
+            console.clear();
+
+            var imageIsLoaded = false;
+
+            //width and height of the window
+            var WIDTH = 800;
+            var HEIGHT = 600;
+
+            //get sliders
+            var rSpaceX = document.getElementById('range_space_x');
+            var rSpaceY = document.getElementById('range_space_y');
+            var rMaxMagnitude = document.getElementById('range_max_magnitude');
+
+            //update values for display
+            updateValues();
+
+            //defualt slider values
+            var DEF_SPACING_X = 100;
+            var DEF_SPACING_Y = 100;
+            var DEF_MAX_MAGNITUDE = 20;
+
+            //set slider values
+            rSpaceX.min = 2;
+            rSpaceX.max = 200;
+            rSpaceX.defualt = DEF_SPACING_X;
+            rSpaceX.step = 2;
+
+            rSpaceY.min = 2;
+            rSpaceY.max = 200;
+            rSpaceY.defualt = DEF_SPACING_Y;
+            rSpaceY.step = 2;
+
+            rMaxMagnitude.min = 1;
+            rMaxMagnitude.max = 100;
+            rMaxMagnitude.defualt = DEF_MAX_MAGNITUDE;
+            rMaxMagnitude.step = 1;
+
+            //make sure that pixi is working properly
+            var type = "WebGL";
+            if (!PIXI.utils.isWebGLSupported()) {
+                type = "canvas";
+            }
+
+            //is it is working right then webgl should appear in console
+            PIXI.utils.sayHello(type);
+
+            //variables for our window and graphics
+            const APP_BG_COLOR = 0xFFFFFF;
+            var app, graphics;
+            app = new PIXI.Application(0, 0, {
+                backgroundColor: 0x000000
+            });
+
+            document.getElementById('main-view').appendChild(app.view);
+
+            //variable to hold our image
+            var image;
+
+            //holds our voronoi diargram
+            var vMesh;
+
+            const AA = true;
+
+            //creates our window that is the same size as the image
+            function createWindow(width, height) {
+                //remove the old app from the window
+                document.getElementById('main-view').removeChild(app.view);
+
+                //create the new app with correct size and add that to the site
+                app = new PIXI.Application(width, height, {
+                    antialias: AA
+                }, {
+                    backgroundColor: APP_BG_COLOR
+                });
+
+                document.getElementById('main-view').appendChild(app.view);
+
+                graphics = new PIXI.Graphics();
+            }
+
+            //creates the pixi.js compatible image from loaded file
+            function createImage() {
+                var img = document.getElementById("user-image");
+
+                image = PIXI.Sprite.fromImage(img.src);
+
+                console.log(image.width, image.height);
+
+                WIDTH = image.width;
+                HEIGHT = image.height;
+            }
+
+            //loads image file
+            //gets called when the button is pressed
+            function loadFile() {
+                var preview = document.querySelector("img");
+                var file = document.querySelector("input[type=file]").files[0];
+                var reader = new FileReader();
+
+                reader.addEventListener("load", function() {
+                    preview.src = reader.result;
+                }, false);
+
+                if (file) {
+                    reader.readAsDataURL(file);
+                    imageIsLoaded = true;
+                }
+            }
+
+            //displays loaded image
+            function displayImage() {
+                app.stage.addChild(image);
+            }
+
+            //generates delaunay and vornoi mesh from set of points
+            var dMesh;
+
+            function generate() {
+                //clear graphics
+                graphics.clear();
+
+                //get slider values
+                var xSpace = parseInt(rSpaceX.value),
+                    ySpace = parseInt(rSpaceY.value),
+                    maxMagnitude = parseInt(rMaxMagnitude.value);
+
+                //generate grid from starting values
+                verts = Grid.generate([image.width, image.height], [xSpace, ySpace], maxMagnitude);
+
+                //triangulate the vertices
+                var triPoints = Delaunay.triangulate(verts);
+                //since the triangulation algorithm spits out the triangles in a weird way
+                //we convert the weird set of points into an array of points
+                //that we push to an array to hold our 'triangles'
+                var mesh = [];
+                for (var i = triPoints.length; i;) {
+                    --i;
+                    var p1 = [verts[triPoints[i]][0], verts[triPoints[i]][1]];
+                    --i;
+                    var p2 = [verts[triPoints[i]][0], verts[triPoints[i]][1]];
+                    --i;
+                    var p3 = [verts[triPoints[i]][0], verts[triPoints[i]][1]];
+                    mesh.push([p1, p2, p3]);
+                }
+                dMesh = mesh;
+
+                //get the voronoi cell verts from the triangles
+                vMesh = Voronoi.generate(verts, mesh);
+            }
+
+            //draws delaunay triangles
+            function drawMesh(mesh) {
+                //graphics.beginFill(0xffffff);
+                graphics.lineStyle(2, 0xf47742, 1);
+                for (var i = 0; i < mesh.length; i++) {
+                    graphics.drawCircle(mesh[i][1][0], mesh[i][1][1], 2);
+                    graphics.drawCircle(mesh[i][2][0], mesh[i][2][1], 2);
+                    graphics.drawCircle(mesh[i][0][0], mesh[i][0][1], 2);
+                    graphics.moveTo(mesh[i][0][0], mesh[i][0][1]);
+                    graphics.lineTo(mesh[i][1][0], mesh[i][1][1]);
+                    graphics.lineTo(mesh[i][2][0], mesh[i][2][1]);
+                    graphics.lineTo(mesh[i][0][0], mesh[i][0][1]);
+                }
+                graphics.endFill();
+            }
+
+            //draws voronoi diagram
+            function drawVoronoiMesh(vMesh) {
+
+                var renderer = app.renderer;
+                var pixels = renderer.extract.pixels(image); //extracts pixel data as Uint8 clamped array
+
+                for (var i = 0; i < vMesh.length; i++) {
+                    var fillColor;
+
+                    //clamp the x and y sample points to be within the image dimensions
+                    var xSample = Math.max(Math.min(Math.round(verts[i][0]), image.width - 1), 0);
+                    var ySample = Math.max(Math.min(Math.round(verts[i][1]), image.height - 1), 0);
+
+                    var index = ((ySample * (image.width * 4)) + (xSample * 4))
+
+                    //get the rgb values from the pixel array
+                    var r = pixels[index + 0];
+                    var g = pixels[index + 1];
+                    var b = pixels[index + 2];
+
+                    //convert rgb to hex to use as fill color
+                    fillColor = PIXI.utils.rgb2hex([r / 255, g / 255, b / 255]);
+
+                    graphics.beginFill(fillColor);
+                    graphics.lineStyle(Math.max(2, Math.random() * 3), 0x000000, 1);
+
+                    var polygon = vMesh[i];
+
+                    graphics.moveTo(polygon[0][0], polygon[0][1])
+                    for (var j = 1; j < polygon.length; j++) {
+                        graphics.lineTo(polygon[j][0], polygon[j][1]);
+                    }
+
+                    graphics.endFill();
+                }
+            }
+
+            //draw border around the image
+            function drawBorder() {
+                graphics.lineStyle(10, 0x000000, 1);
+
+                graphics.moveTo(0, 0);
+                graphics.lineTo(0, HEIGHT);
+                graphics.lineTo(WIDTH, HEIGHT);
+                graphics.lineTo(WIDTH, 0);
+                graphics.lineTo(0, 0);
+            }
+
+            //diplays the graphics
+            function displayGraphics() {
+                app.stage.addChild(graphics);
+            }
+
+            //updates the blur filter and image
+            function updateImage() {
+                //create the image
+                console.time("img_creation");
+                createImage();
+                console.timeEnd("img_creation");
+
+                //create the app window to be the same size as the image
+                console.time("window_creation");
+                createWindow(image.width, image.height);
+                console.timeEnd("window_creation");
+
+                //display the image
+                console.time("img_display");
+                displayImage();
+                console.timeEnd("img_diplay");
+
+                //create and draw the vornoi diagram
+                console.time("voronoi_gen");
+                updateVornoi();
+                console.timeEnd("vornoi_gen");
+            }
+
+            //updates the vornoi diagrams and associated graphics
+            function updateVornoi() {
+                //generate new graph
+                generate();
+
+                //draw the graph
+                drawVoronoiMesh(vMesh);
+                //drawMesh(dMesh);
+
+                //draws the border
+                drawBorder();
+
+                //display graphics
+                displayGraphics();
+            }
+
+            //executes everything needed to update the screen when a new image is uploaded
+            function update() {
+                //first load the file and the get the users image
+                loadFile();
+
+                //creates and updates the image
+                updateImage();
+            }
+
+            //updates all of the balues to be displayed next to the range inputs
+            function updateValues() {
+                document.getElementById("p1").innerHTML = "" + parseInt(document.getElementById("range_space_x").value) + "px";
+                document.getElementById("p2").innerHTML = "" + parseInt(document.getElementById("range_space_y").value) + "px";
+                document.getElementById("p3").innerHTML = "" + parseInt(document.getElementById("range_max_magnitude").value);
+            }
+
+        </script>
+    </div>
+</body>
+
+</html>
