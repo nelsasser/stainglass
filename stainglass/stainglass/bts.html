@@ -1,0 +1,270 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <title>StainGlass</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <link rel="stylesheet" href="prism.css">
+    <link rel="stylesheet" type="text/css" href="style-sheet-bts.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script src="js/prism.js" type="text/javascript"></script>
+
+</head>
+
+<body>
+    <div id="menu">
+        <ul>
+            <li><a href="index.html">App</a></li>
+            <li><a href="bts.html">BTS</a></li>
+            <li><a href="help.html">Help</a></li>
+        </ul>
+    </div>
+    <div id="main">
+        <div id="Welcome" class="entry">
+            <h>Welcome, this page explains what goes on begind the scenes of the stain glassifier. The filter will be demonstrated on the image below.</h>
+
+            <button type="button" class="expand" data-toggle="collapse" data-target="#welcome-dd">More Info</button>
+            <div id="welcome-dd" class="collapse info">Use the "more info" buttons to see a more detailed breakdown of what goes on in the app.</div>
+
+            <img src="images/image_unfiltered.jpg" alt="unfiltered image" style="width: 40%;">
+        </div>
+        <div id="points" class="entry">
+            <p>After an image has been uploaded a set of points is generated in along a grid inside of the image. The spacing of the points is constrained by the x-spacing and y-spacing sliders. The points are then given a randomly generated movement vector, constrained by the max offset slider. The points are then pushed along that vector, in order to randomize their position. They can be seen as the orange dots scattered across the image.</p>
+
+            <img src="images/image_point_cloud.png" alt="point cloud" style="width: 40%;">
+        </div>
+        <div id="triangulation" class="entry">
+            <p>This new array of points will be the verticies for our triangles in the delaunay triangulation process. The final image of the stain glass gets its appearence from voronoi tesselation, which just so happens to be the dual graph of a delaunay mesh. So computing the triangular mesh gives us a fast and easy way to generate the voronoi cells that appear in the final image.</p>
+
+            <button type="button" class="expand" data-toggle="collapse" data-target="#dm-dd">More Info</button>
+            <div id="dm-dd" class="collapse info">All of the generation for the triangle mesh is done from ironwallaby's delaunay triangulation algorithm <a>https://github.com/ironwallaby/delaunay</a>.</div>
+
+            <div></div>
+            <img src="images/image_tri_mesh.png" alt="triangle mesh" style="width: 40%;">
+        </div>
+        <div id="voronoi-verts" class="entry">
+            <p>Then the circumencenter for each triangle is calculated (blue dots), these points will be the verticies for the voronoi cells that actually make up the final image.</p>
+            <img src="images/image_tri_v_points.png" alt="triangle circumcenters" style="width: 40%;">
+        </div>
+        <div id="voronoi-mesh" class="entry">
+            <p>
+                Each of these points are connected to form the polygons that make up the final tesselation.
+            </p>
+
+            <button type="button" class="expand" data-toggle="collapse" data-target="#v-mi">More Info</button>
+
+            <div id="v-mi" class="collapse info">
+                <p>
+                    This is where most of the work is done in the algorithm. The process of connecting the points in the porper order seems daunting at first, but looking closely at the image will reveal a special pattern.
+                </p>
+
+                <img src="images/upclose.png" alt="unfiltered image" style="width: 10%; position: relative;">
+
+                <p>
+                    Each voronoi polygon surrounds only one of the triangular mesh's verticies. This means that we can solve the daunting task by just figuring out each triangles neighbor, which can be done by checking if any two triangles share two verticies (although this method is easy, it can be very slow with lots of triangles, because each triangle checks every single other triangle, and also takes up a lot of memory for dense meshes). We will save the neighbors for later.
+                </p>
+
+                <button type="button" class="expand" data-toggle="collapse" data-target="#code-1">See Code</button>
+                <div id="code-1">
+                    <pre class="line-numbers language-javascript">
+                    <code>
+                    <script>
+                        //finds all of the neighbors of a triangle
+                        //by checking if two of its point are shared with any other triangle
+                        function findNeighbors(triangles) {
+                            var neighbors = [];
+
+                            //loop through all of the triangles
+                            for (var i = 0; i < triangles.length; i++) {
+                                var localNeighbors = [];
+
+                                //have every triangle check with every other triangle
+                                for (var j = 0; j < triangles.length; j++) {
+                                    var orgTri = triangles[i].slice();
+                                    var checkTri = triangles[j].slice();
+
+                                    //make sure we aren'y checking the same triangle against itself
+                                    if (i != j) {
+                                        //counter to keep track of how many shared points there are
+                                        var n = 0;
+                                        //loop through all the points of one triangle
+                                        for (var k = orgTri.length - 1; k >= 0; k--) {
+                                            //and all of the points in the other triangle
+                                            for (var l = checkTri.length - 1; l >= 0; l--) {
+                                                //check if they are the same
+                                                if (orgTri[k][0] == checkTri[l][0] && orgTri[k][1] == checkTri[l][1]) {
+                                                    //if they are the same add one to the counter of shared points
+                                                    //and remove those points from the arrays so we don't check them again
+                                                    //then stop looping because we already found the shared points for the indices
+                                                    n++;
+                                                    orgTri.splice(k, k);
+                                                    checkTri.splice(l, l);
+                                                    break;
+                                                }
+                                            }
+
+                                            if (n == 2 || k < 0) {
+                                                break;
+                                            }
+                                        }
+
+                                        //if we counted two shared points, add the index of that triangles circumcenter
+                                        //to an array of local neighbors
+                                        if (n == 2) {
+                                            localNeighbors.push(j);
+                                        }
+                                    }
+                                }
+
+                                //then push all of the local neighbors
+                                neighbors.push(localNeighbors);
+                            }
+
+                            return neighbors;
+                        }
+
+                    </script>
+                    </code>
+                </pre>
+                </div>
+
+                <p>
+                    Now that we have all of the triangles, and all of the triangles have their neighbors, we can then move on to find all of the points in the polygon. We can do this looping through every point in the "grid" we first created, and for each of those points, loop through every triangle and see if any of its verticies tough that point. If one just so happens to do so, then it's circumcenter is added to the unsorted polygon.
+                </p>
+
+                <button type="button" class="expand" data-toggle="collapse" data-target="#code-2">See Code</button>
+                <div id="code-2">
+                    <pre class="language-javascript">
+                        <code>
+                            <script>
+                                function createPolygons(grid, triangles, points, neighbors) {
+                                    //list to hold all polygons
+                                    var polygons = [];
+
+                                    //loop through all the points in the grid
+                                    for (var i = 0; i < grid.length; i++) {
+                                        //get the point in the grid
+                                        var pt = grid[i].slice();
+
+                                        //the polygon around the points
+                                        var unsortedPolygon = [];
+
+                                        //loop through each triangle
+                                        //and test if they share any points with the grid points
+                                        for (var j = 0; j < triangles.length; j++) {
+                                            var tri = triangles[j].slice();
+
+                                            //loop through all the points in the triangle
+                                            for (var k = 0; k < tri.length; k++) {
+                                                //and see if they match with the grid point
+                                                if (ptsEql(pt, tri[k])) {
+                                                    //if they match add that triangle's circumcenter index to the
+                                                    //array that is the polygon
+                                                    unsortedPolygon.push(j);
+                                                    break;
+                                                }
+                                            }
+                                        }
+
+                                        //once we have the points in the polygon we need to sort them into a circular order
+                                        var sortedPolygon = [];
+                                        orderPoints(unsortedPolygon[0], unsortedPolygon, sortedPolygon, neighbors);
+
+                                        //then convert index values to actual coordinates to draw
+                                        convIndToCoords(sortedPolygon, points);
+
+                                        //add the new polygon to the list
+                                        polygons.push(sortedPolygon);
+                                    }
+
+
+                                    //return the list of polygons
+                                    return polygons;
+                                }
+                            </script>
+                        </code>
+                    </pre>
+                </div>
+
+                <p>
+                    Now that we have all of the polygons, we need to sort the points in some sort of order to we can draw them properly. We can do this recursively by starting at one triangle that has it's circumcenter as a vertex in the polygon, then we look at each of its neighbors, to check if: <strong>A</strong>. it's circumcenter is in the polygon. <strong>B</strong>. if it's circumcenter hasn't already been added to the sorted polygon. <strong>C</strong>. if we aren't looking at the polygon we just came from. If our triangle and it's circumcenter pass this test, then it is added to the sorted polygon, otherwise, keep checking the neighbors. Once we find it and it's added, we do the same thing for the one we just found. This keeps happening until the sorted polygon has the same number of verts as the unsorted, and we can finally finish up and draw the polygons!
+                </p>
+
+                <button type="button" class="expand" data-toggle="collapse" data-target="#code-3">See Code</button>
+                <div id="code-3">
+                    <pre class="language-javascript">
+                        <code>
+                            <script>
+                                function orderPoints(checkPt, unsortedPolygon, sortedPolygon, neighbors) {
+                                    //since we have an array of all of the indexs
+                                    //we can sort them into an circular order
+                                    //by checking if two points are neighbors
+
+                                    //check to see if the sorted polygon has the same number of points as the unsorted one
+                                    if (unsortedPolygon.length + 1 == sortedPolygon.length) {
+                                        return;
+                                    }
+
+
+                                    //start off by looking at the neighbors of the checkpoint
+                                    for (var i = 0; i < neighbors[checkPt].length; i++) {
+                                        //then see if any of it's neighbors are in the polygon
+                                        for (var j = 0; j < unsortedPolygon.length; j++) {
+
+                                            //check to see if the neighbor is in the polygon
+                                            if (neighbors[checkPt][i] == unsortedPolygon[j]) {
+                                                //then check to make sure we aren't looking are the neighbor we just came from
+                                                if (sortedPolygon.length < 1 || neighbors[checkPt][i] != sortedPolygon[sortedPolygon.length - 1]) {
+                                                    //if they are not the same and the last neighbor exists then we can add this point to the newPolygon
+                                                    sortedPolygon.push(checkPt);
+
+                                                    checkPt = neighbors[checkPt][i];
+
+                                                    orderPoints(checkPt, unsortedPolygon, sortedPolygon, neighbors);
+
+                                                    return;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    return;
+                                }
+                            </script>
+                        </code>
+                    </pre>
+                </div>
+            </div>
+
+            <div></div>
+            <img src="images/image_tri_v_tess.png" alt="tesselated image" style="width: 40%;">
+        </div>
+        <div id="final" class="entry">
+            <p>
+                Finally the image is ready to be filtered. First the polygons are drawn by filling them in with a color sampled from the image, and then outlined with a black border that varies in length. Finally, the black outline is drawn to completely finalize the image.
+            </p>
+
+            <button type="button" class="expand" data-toggle="collapse" data-target="#f-c">More Info</button>
+            <div id="f-c" class="collapse info">
+                <p>
+                    The colors are sampled from where the singular triangle mesh vertex in each voronoi cell lies.
+                </p>
+            </div>
+
+            <div></div>
+            <img src="images/image_filtered.png" alt="filtered image" style="width: 40%;">
+        </div>
+        <div id="sc" class="entry">
+            <p>
+                Full source code for the whole project can be found on github at: <a></a>
+            </p>
+        </div>
+    </div>
+    <div id="footer">
+        <p style="text-align: center;"> Created by Nick Elsasser</p>
+    </div>
+</body>
+
+</html>
