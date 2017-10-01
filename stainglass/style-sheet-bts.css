@@ -29,6 +29,16 @@ body {
     display: inline-block;
 }
 
+#footer {
+    width: 100%;
+    background-color: black;
+    margin:10px;
+    padding: 10px;
+    border-top: solid 2px gray;
+    display: flex;
+    color: #383a3d;
+}
+
 .entry {
     color: whitesmoke;
     width: 100%;

@@ -52,6 +52,16 @@ body {
     padding: 10px
 }
 
+#footer {
+    width: 100%;
+    background-color: black;
+    margin:10px;
+    padding: 10px;
+    border-top: solid 2px gray;
+    display: flex;
+    color: #383a3d;
+}
+
 button {
     background-color: #555555;
     border: none;
